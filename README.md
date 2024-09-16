@@ -45,4 +45,4 @@ This project is licensed under the [Unlicense](https://unlicense.org/) License -
 
 * [inter-process_communication_in_linux.pdf](https://opensource.com/sites/default/files/gated-content/inter-process_communication_in_linux.pdf)
 * [Martin Kalin](https://condor.depaul.edu/mkalin/)
-* [Matrin Kalin's Source code for the series on IPC in Linux](https://condor.depaul.edu/mkalin/ipcCode.zip)
+* [Martin Kalin's Source code for the series on IPC in Linux](https://condor.depaul.edu/mkalin/ipcCode.zip)
