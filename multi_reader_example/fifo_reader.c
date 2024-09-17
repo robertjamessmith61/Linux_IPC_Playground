@@ -5,18 +5,18 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "fifo_common.h"
 
-int main()
+int main(int argc, char *argv[])
 {
-    printf("Chunksize == %ikB.\n", ChunkSize / 1024);
-
-    const char *txName = "./fifoTx";
-    const char *rxName = "./fifoRx";
+    const char *txName = "./fifo_multi_Tx";
+    const char *rxName = "./fifo_multi_Rx";
 
     const long bufLen = ChunkSize * sizeof(char);
 
     char *txData = (char *)calloc(ChunkSize, sizeof(char));
+    char *rxData = (char *)calloc(ChunkSize, sizeof(char));
 
     mkfifo(txName, 0666);                        /* read/write for user/group/others */
     int txFd = open(txName, O_CREAT | O_RDONLY); /* open as write-only */
@@ -37,7 +37,7 @@ int main()
         if (count <= 0)
             break; /* end of stream */
         else
-            write(rxFd, txData, bufLen);
+            printf("recieved:\n%s", txData);
     }
 
     close(txFd);    /* close pipe: generates an end-of-file */
@@ -45,8 +45,6 @@ int main()
 
     close(rxFd);
     unlink(rxName);
-
-    printf("Done echoing\n");
 
     free(txData);
     free(rxData);

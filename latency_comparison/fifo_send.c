@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 
     if (argc != 2)
     {
-        printf("Incorrect number of arguments [%i]", argc - 1);
+        printf("Incorrect number of arguments [%i]\n", argc - 1);
         printUsage();
         exit(-1);
     }
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
         MaxLoops = strtol(argv[1], &endptr, 10);
         if (MaxLoops == 0)
         {
-            printf("[num_loops] must be a non zero positive integer.");
+            printf("[num_loops] must be a non zero positive integer.\n");
             printUsage();
             exit(-1);
         }
@@ -114,14 +114,15 @@ int main(int argc, char *argv[])
     printf("%fns roundtrip latency per byte.\n", (time_spent / bytesRead) * 1000); // nanoseconds
 
     free(txData);
+    free(rxData);
 
     return 0;
 }
 
 void printUsage()
 {
-    printf("Tests named pipe latency by sending random bytes.");
-    printf("Usage: fifosend [num_loops]");
+    printf("Tests named pipe latency by sending random bytes.\n");
+    printf("Usage: fifosend [num_loops]\n");
 }
 
 void printBytes(long bytes, char *retString)

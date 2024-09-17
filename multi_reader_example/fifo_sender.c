@@ -5,39 +5,42 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "fifo_common.h"
 
-int main()
+int main(int argc, char *argv[])
 {
-    printf("Chunksize == %ikB.\n", ChunkSize / 1024);
-
-    const char *txName = "./fifoTx";
-    const char *rxName = "./fifoRx";
+    const char *txName = "./fifo_multi_Tx";
+    const char *rxName = "./fifo_multi_Rx";
 
     const long bufLen = ChunkSize * sizeof(char);
 
     char *txData = (char *)calloc(ChunkSize, sizeof(char));
+    char *rxData = (char *)calloc(ChunkSize, sizeof(char));
 
     mkfifo(txName, 0666);                        /* read/write for user/group/others */
-    int txFd = open(txName, O_CREAT | O_RDONLY); /* open as write-only */
+    int txFd = open(txName, O_CREAT | O_WRONLY); /* open as write-only */
     if (txFd < 0)
         return -1; /** error **/
 
     mkfifo(rxName, 0666);                        /* read/write for user/group/others */
-    int rxFd = open(rxName, O_CREAT | O_WRONLY); /* open as read-only */
+    int rxFd = open(rxName, O_CREAT | O_RDONLY); /* open as read-only */
     if (rxFd < 0)
         return -1; /** error **/
 
     while (1)
     {
-        // char txData[ChunkSize];
+        printf("Type message and press enter (type exit to close app):\n");
+        if (fgets(txData, bufLen, stdin) == NULL)
+            continue;
 
-        ssize_t count = read(txFd, txData, bufLen);
+        if (strcmp(txData, "exit\n") == 0)
+            break;
 
-        if (count <= 0)
-            break; /* end of stream */
-        else
-            write(rxFd, txData, bufLen);
+        printf("Message:\n");
+        printf("%s", txData);
+
+        ssize_t txCount = write(txFd, txData, strcspn(txData, "\0"));
     }
 
     close(txFd);    /* close pipe: generates an end-of-file */
@@ -45,8 +48,6 @@ int main()
 
     close(rxFd);
     unlink(rxName);
-
-    printf("Done echoing\n");
 
     free(txData);
     free(rxData);
