@@ -49,7 +49,6 @@ int main()
     printf("Done echoing\n");
 
     free(txData);
-    free(rxData);
 
     return 0;
 }

@@ -15,7 +15,7 @@ The fifo_echo app should be started first. It simply reads out from one pipe and
 Build both fifo_send and fifo_echo apps using gcc:
 
 ```bash
-gcc -o fifo_send fifo_send.c -pthread && gcc -o fifo_echo fifo_echo.c -pthread
+if [ ! -d bin ]; then mkdir bin; fi && gcc -o bin/fifo_send fifo_send.c -pthread && gcc -o bin/fifo_echo fifo_echo.c -pthread
 ```
 
 ## Running the programs
@@ -23,11 +23,11 @@ gcc -o fifo_send fifo_send.c -pthread && gcc -o fifo_echo fifo_echo.c -pthread
 Start fifo_echo in one terminal first:
 
 ```bash
-./fifo_echo
+./bin/fifo_echo
 ```
 
 Then start fifo_send in a separate terminal and specify the number of loops to run:
 
 ```bash
-./fifo_send 100
+./bin/fifo_send 100
 ```
