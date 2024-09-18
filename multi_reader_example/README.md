@@ -25,14 +25,15 @@ if [ ! -d bin ]; then mkdir bin; fi && gcc -o bin/fifo_sender fifo_sender.c -pth
 Start multiple fifo_reader processes in separate terminals first (You need at least two to test behaviour):
 
 ```bash
-./fifo_reader
+./bin/fifo_reader
 ```
 
 Then start fifo_sender in a separate terminal and when prompted type some text and press enter:
 
 ```bash
-./fifo_sender
-
+./bin/fifo_sender
+```
+```
 Type message and press enter (type exit to close app):
 example text
 Message:
@@ -41,7 +42,7 @@ example text
 
 You should see the text you typed printed out by only one of the reader processes.
 
-```bash
+```
 recieved:
 example text
 ```
