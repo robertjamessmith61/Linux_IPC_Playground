@@ -94,6 +94,9 @@ static int *pipe_listener(void *arg)
         pthread_exit(error);
     }
 
+    /*
+    Listen for incoming connections and process their messages.
+    */
     while (1)
     {
         ssize_t count = read(listenerFd, listenerData, bufLen);

@@ -9,7 +9,7 @@ If index is less than zero or greater than or equal to the current list count, t
 current list. Otherwise node will be inserted at the specified index.
 Returns the new count of the list.
 */
-int AddNode(LinkedList *list, Node *node, int index)
+int AddNode(LinkedList *list, Node *node)
 {
     if (list->last == NULL) // List is empty
     {
@@ -17,45 +17,11 @@ int AddNode(LinkedList *list, Node *node, int index)
         list->last = node;
         list->count = 1;
     }
-    else if (index < 0 || index >= list->count) // put new node at end of list
+    else // put new node at end of list
     {
         list->last->next = node;
         node->prev = list->last;
         list->last = node;
-        list->count++;
-    }
-    else if (index > list->count / 2) // index is in second half of list, so we'll step backwards to insert it
-    {
-        int i;
-        Node *currentNode = list->last;
-
-        for (i = list->count; i > index + 1; i--)
-        {
-            currentNode = currentNode->prev;
-        }
-
-        node->prev = currentNode->prev;
-        currentNode->prev->next = node;
-        node->next = currentNode;
-        currentNode->prev = node;
-
-        list->count++;
-    }
-    else // index is in first half of list, so we'll step forwards to insert it
-    {
-        int i;
-        Node *currentNode = list->first;
-
-        for (i = 0; i < index; i++)
-        {
-            currentNode = currentNode->next;
-        }
-
-        node->prev = currentNode->prev;
-        currentNode->prev->next = node;
-        node->next = currentNode;
-        currentNode->prev = node;
-
         list->count++;
     }
 

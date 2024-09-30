@@ -25,7 +25,7 @@ typedef struct LinkedList
 // --
 
 // -- Function declarations
-int AddNode(LinkedList *list, Node *node, int index);
+int AddNode(LinkedList *list, Node *node);
 int DelNodeByAddress(LinkedList *list, Node *nodeAddress);
 int DelNodeByKey(LinkedList *list, char *nodeKey);
 // --
