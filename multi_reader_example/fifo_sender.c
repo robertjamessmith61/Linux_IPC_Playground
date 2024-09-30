@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
         ssize_t txCount = write(txFd, txData, strcspn(txData, "\0"));
     }
 
-    close(txFd);    /* close pipe: generates an end-of-file */
+    // close(txFd);    /* close pipe: generates an end-of-file */
     unlink(txName); /* unlink from the implementing file */
 
     free(txData);
