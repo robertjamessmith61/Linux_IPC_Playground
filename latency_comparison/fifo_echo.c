@@ -9,14 +9,14 @@
 
 int main()
 {
-    printf("Chunksize == %ikB.\n", ChunkSize / 1024);
+    printf("CHUNKSIZE == %ikB.\n", CHUNKSIZE / 1024);
 
     const char *txName = "./fifoTx";
     const char *rxName = "./fifoRx";
 
-    const long bufLen = ChunkSize * sizeof(char);
+    const long bufLen = CHUNKSIZE * sizeof(char);
 
-    char *txData = (char *)calloc(ChunkSize, sizeof(char));
+    char *txData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     mkfifo(txName, 0666);                        /* read/write for user/group/others */
     int txFd = open(txName, O_CREAT | O_RDONLY); /* open as write-only */
@@ -30,7 +30,7 @@ int main()
 
     while (1)
     {
-        // char txData[ChunkSize];
+        // char txData[CHUNKSIZE];
 
         ssize_t count = read(txFd, txData, bufLen);
 

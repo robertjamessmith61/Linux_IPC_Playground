@@ -12,9 +12,9 @@ int main(int argc, char *argv[])
 {
     const char *txName = "./fifo_multi_Tx";
 
-    const long bufLen = ChunkSize * sizeof(char);
+    const long bufLen = CHUNKSIZE * sizeof(char);
 
-    char *txData = (char *)calloc(ChunkSize, sizeof(char));
+    char *txData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     mkfifo(txName, 0666);                        /* read/write for user/group/others */
     int txFd = open(txName, O_CREAT | O_WRONLY); /* open as write-only */
@@ -36,8 +36,9 @@ int main(int argc, char *argv[])
         ssize_t txCount = write(txFd, txData, strcspn(txData, "\0"));
     }
 
-    // close(txFd);    /* close pipe: generates an end-of-file */
-    unlink(txName); /* unlink from the implementing file */
+    close(txFd);    /* close pipe: generates an end-of-file */
+    // unlink(txName); /* unlink from the implementing file */
+    /* unlinking will prevent other processes from finding the pipe */
 
     free(txData);
 

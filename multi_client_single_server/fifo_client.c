@@ -13,10 +13,10 @@ int main(int argc, char *argv[])
     const char *txName = "./fifo_multi_Tx";
     const char *rxName = "./fifo_multi_Rx";
 
-    const long bufLen = ChunkSize * sizeof(char);
+    const long bufLen = CHUNKSIZE * sizeof(char);
 
-    char *txData = (char *)calloc(ChunkSize, sizeof(char));
-    char *rxData = (char *)calloc(ChunkSize, sizeof(char));
+    char *txData = (char *)calloc(CHUNKSIZE, sizeof(char));
+    char *rxData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     mkfifo(txName, 0666);                        /* read/write for user/group/others */
     int txFd = open(txName, O_CREAT | O_RDONLY); /* open as write-only */
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        // char txData[ChunkSize];
+        // char txData[CHUNKSIZE];
 
         ssize_t count = read(txFd, txData, bufLen);
 

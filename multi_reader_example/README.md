@@ -10,6 +10,13 @@ The fifo_sender app prompts the user for input and then sends this text over a n
 ### fifo_reader
 The fifo_reader app simply reads from the named pipe and prints to the screen.
 
+### Closing vs unlinking pipes
+When a process ends it should call close() on the pipe file descriptor so that the OS knows it is no longer using it. When all write processes have called close() then an EOF will be sent.
+
+You should not call unlink() until you are sure all processes have finished using the pipe. This removes the link to the filename which is required for any new process to open the pipe.
+
+For example if I have one reader and multiple sender processes. I would only call unlink() from the reader process when it is finished.
+
 ## Build
 
 Build both fifo_sender and fifo_reader apps using gcc:

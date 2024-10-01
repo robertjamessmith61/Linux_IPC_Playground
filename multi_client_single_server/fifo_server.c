@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include "fifo_common.h"
-#include "linked_list.h"
+#include "lib/linked_list/linked_list.h"
 
 // https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
 
@@ -18,7 +18,8 @@
 // --
 
 // -- Constants
-const long bufLen = ChunkSize * sizeof(char);
+const long bufLen = CHUNKSIZE * sizeof(char);
+const char *cmdSubscribe = "subscribe";
 // --
 
 // -- Global variables
@@ -51,7 +52,7 @@ int main(int argc, char *argv[])
     listenerReturn = pthread_create(&listenerThread, NULL, pipe_listener, (void *)rxName);
 
     char *senderData;
-    senderData = (char *)calloc(ChunkSize, sizeof(char));
+    senderData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     while (1)
     {
@@ -66,6 +67,18 @@ int main(int argc, char *argv[])
         printf("%s", senderData);
 
         // ssize_t txCount = write(txFd, senderData, strcspn(senderData, "\0"));
+
+        Node *subscriberNode = subscibers->first;
+
+        while (subscriberNode != NULL)
+        {
+            ssize_t txCount = write((*(int *)subscriberNode->data), senderData, strcspn(senderData, "\0"));
+
+            if (txCount > 0)
+            {
+                printf("Wrote %i bytes to subscriber %s", txCount, (char *)(subscriberNode->key));
+            }
+        }
     }
 
     pthread_join(listenerThread, NULL);
@@ -82,15 +95,15 @@ static int *pipe_listener(void *arg)
     listenerName = (char *)arg;
 
     // Allocate rx buffer
-    listenerData = (char *)calloc(ChunkSize, sizeof(char));
+    listenerData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     // Create named pipe
     mkfifo(listenerName, 0666);                          // read/write permissions for user/group/everyone
-    listenerFd = open(listenerName, O_CREAT | O_RDONLY); // Create if doesn't exist, read-only
+    listenerFd = open(listenerName, O_CREAT | O_RDWR); // Create if doesn't exist, read-only
     if (listenerFd < 0)
     {
         int error = errno;
-        printf(stderr, "Failed to create named pipe: %s", listenerName);
+        fprintf(stderr, "Failed to create named pipe: %s\n", listenerName);
         pthread_exit(error);
     }
 
@@ -104,7 +117,60 @@ static int *pipe_listener(void *arg)
         if (count <= 0)
             break; /* end of stream */
         else
-            printf("recieved:\n%s", listenerData);
+            printf("recieved:\n%s\n", listenerData);
+
+        /*
+        Check message type and handle appropriately. Message should be comma separated, starting with a command and
+        followed by any arguments
+        */
+        char *token = strtok(listenerData, ",");
+        while (token != NULL)
+        {
+            printf("Command: %s\n", token);
+
+            // subscribe command. Add named pipe to subscriber list
+            if (strncmp(token, cmdSubscribe, strlen(cmdSubscribe)) == 0)
+            {
+                token = strtok(NULL, ",");
+
+                if (token == NULL)
+                {
+                    fprintf(stderr, "error: commmand %s missing argument\n", cmdSubscribe);
+
+                    continue; // start loop again
+                }
+
+                size_t pipeNameLen = strlen(token);
+
+                // check pipe name isn't too long
+                if (pipeNameLen > MAX_PIPE_NAME_LEN)
+                {
+                    fprintf(stderr, "error: commmand %s pipe name length is greater than %i: %s\n",
+                            cmdSubscribe, MAX_PIPE_NAME_LEN, token);
+
+                    continue; // start loop again
+                }
+
+                // Create new node for our subscriber
+                Node *newNode = (Node *)calloc(1, sizeof(Node));
+
+                newNode->key = calloc(pipeNameLen + 1, sizeof(char)); // add 1 for null terminator
+                strncpy(((char *)newNode->key), token, pipeNameLen);
+
+                newNode->data = calloc(1, sizeof(int));
+
+                // open named pipe
+                *((int *)newNode->data) = open(((char *)newNode->key), O_CREAT | O_WRONLY); // Create if doesn't exist, write-only
+                if (*((int *)newNode->data) < 0)
+                {
+                    fprintf(stderr, "Failed to create named pipe: %s\n", ((char *)newNode->key));
+                    continue; // start loop again
+                }
+
+                // if we successfully opened the pipe, add it to the subscriber list
+                AddNode(subscibers, newNode);
+            }
+        }
     }
 
     pthread_cleanup_pop(1);
@@ -119,7 +185,7 @@ static int *pipe_listener_cleanup(void *arg)
     if (retVal < 0)
     {
         int error = errno;
-        printf(stderr, "Failed to close file handle: %i", listenerFd);
+        fprintf(stderr, "Failed to close file handle: %i\n", listenerFd);
         return error;
     }
     unlink(listenerName);

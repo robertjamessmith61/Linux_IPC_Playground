@@ -32,15 +32,15 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("Chunksize == %ikB.\n", ChunkSize / 1024);
+    printf("CHUNKSIZE == %ikB.\n", CHUNKSIZE / 1024);
 
     const char *txName = "./fifoTx";
     const char *rxName = "./fifoRx";
 
-    const long bufLen = ChunkSize * sizeof(char);
+    const long bufLen = CHUNKSIZE * sizeof(char);
 
-    char *txData = (char *)calloc(ChunkSize, sizeof(char));
-    char *rxData = (char *)calloc(ChunkSize, sizeof(char));
+    char *txData = (char *)calloc(CHUNKSIZE, sizeof(char));
+    char *rxData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     mkfifo(txName, 0666);                        /* read/write for user/group/others */
     int txFd = open(txName, O_CREAT | O_WRONLY); /* open as write-only */
@@ -60,10 +60,10 @@ int main(int argc, char *argv[])
     int i;
     for (i = 0; i < MaxLoops; i++)
     { /* write MaxWrites times */
-        // char txData[ChunkSize];
+        // char txData[CHUNKSIZE];
 
         long j;
-        for (j = 0; j < (long)ChunkSize; j++)
+        for (j = 0; j < (long)CHUNKSIZE; j++)
         {
             txData[j] = (char)rand();
         }
