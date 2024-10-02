@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include "fifo_common.h"
-#include "lib/linked_list/linked_list.h"
+#include "linked_list.h"
 
 // https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
 
@@ -31,30 +31,37 @@ char *listenerName;
 // <<<<
 
 // >>>> Sender variables
-LinkedList *subscibers;
+LinkedList *subscribers;
 // <<<<
 // <<
 
 // >> Function Declarations
 // >>>> Listener pipe function declarations
-static int *PipeListener(void *arg);
-static int *PipeListenerCleanup(void *arg);
+static void *PipeListener(void *arg);
+static void PipeListenerCleanup(void *arg);
 static void CleanupSubsciberNode(Node *subscriberNode);
 // <<<<
 // <<
 
-int main(int argc, char *argv[])
+// int main(int argc, char *argv[])
+int main()
 {
     // Assign some memory to hold our list of subscribers
-    subscibers = (LinkedList *)calloc(1, sizeof(LinkedList));
+    subscribers = (LinkedList *)calloc(1, sizeof(LinkedList));
 
     // Create our separate thread to handle our listener pipe
     pthread_t listenerThread;
     int listenerReturn;
 
     listenerReturn = pthread_create(&listenerThread, NULL, PipeListener, (void *)rxName);
+    if (listenerReturn != 0)
+    {
+        fprintf(stderr, "Failed to start listener thread\n");
+        free(subscribers);
+        return listenerReturn;
+    }
 
-    // allocate a buffer for our data we are going to push to subscribers
+    // Allocate a buffer for our data we are going to push to subscribers
     char *senderData;
     senderData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
@@ -70,7 +77,7 @@ int main(int argc, char *argv[])
         printf("Message:\n");
         printf("%s", senderData);
 
-        Node *subscriberNode = subscibers->first;
+        Node *subscriberNode = subscribers->first;
 
         while (subscriberNode != NULL)
         {
@@ -78,8 +85,10 @@ int main(int argc, char *argv[])
 
             if (txCount > 0)
             {
-                printf("Wrote %i bytes to subscriber %s", txCount, (char *)(subscriberNode->key));
+                printf("Wrote %li bytes to subscriber %s", txCount, (char *)(subscriberNode->key));
             }
+
+            subscriberNode = subscriberNode->next;
         }
     }
 
@@ -89,22 +98,21 @@ int main(int argc, char *argv[])
     retVal = pthread_cancel(listenerThread);
     if (retVal < 0)
     {
-        int error = errno;
         fprintf(stderr, "Failed to send cancelation request to listener thread\n");
     }
 
     // Close all of our connections
-    Node *subscriberNode = subscibers->first;
+    Node *subscriberNode = subscribers->first;
 
     while (subscriberNode != NULL)
     {
         CleanupSubsciberNode(subscriberNode);
-        DelNodeByAddress(subscibers, subscriberNode);
-        subscriberNode = subscibers->first;
+        DelNodeByAddress(subscribers, subscriberNode);
+        subscriberNode = subscribers->first;
     }
 
     // Finally free our memory
-    free(subscibers);
+    free(subscribers);
     free(senderData);
 
     // Wait for listenerThread to finish cleaning up
@@ -113,7 +121,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-static int *PipeListener(void *arg)
+static void *PipeListener(void *arg)
 {
     // Add our cleanup routine so everything is taken care of if we get cancelled or end gracefully
     pthread_cleanup_push(PipeListenerCleanup, NULL);
@@ -129,9 +137,8 @@ static int *PipeListener(void *arg)
     listenerFd = open(listenerName, O_CREAT | O_RDWR); // Create if doesn't exist, read-only
     if (listenerFd < 0)
     {
-        int error = errno;
         fprintf(stderr, "Failed to create named pipe: %s\n", listenerName);
-        pthread_exit(error);
+        pthread_exit(NULL);
     }
 
     /*
@@ -155,7 +162,7 @@ static int *PipeListener(void *arg)
         {
             printf("Command: %s\n", token);
 
-            // subscribe command. Add named pipe to subscriber list
+            // Subscribe command. Add named pipe to subscriber list
             if (strncmp(token, cmdSubscribe, strlen(cmdSubscribe)) == 0)
             {
                 token = strtok(NULL, ",");
@@ -164,62 +171,64 @@ static int *PipeListener(void *arg)
                 {
                     fprintf(stderr, "error: commmand %s missing argument\n", cmdSubscribe);
 
-                    continue; // start loop again
+                    continue; // Start loop again
                 }
 
                 size_t pipeNameLen = strlen(token);
 
-                // check pipe name isn't too long
+                // Check pipe name isn't too long
                 if (pipeNameLen + 1 > MAX_PIPE_NAME_LEN)
                 {
                     fprintf(stderr, "error: commmand %s - pipe name length is greater than %i: %s\n",
                             cmdSubscribe, MAX_PIPE_NAME_LEN - 1, token);
 
-                    continue; // start loop again
+                    continue; // Start loop again
                 }
 
                 // Create new node for our subscriber
                 Node *newNode = (Node *)calloc(1, sizeof(Node));
 
-                newNode->key = calloc(pipeNameLen + 1, sizeof(char)); // add 1 for null terminator
+                newNode->key = calloc(pipeNameLen + 1, sizeof(char)); // Add 1 for null terminator
                 strncpy(((char *)newNode->key), token, pipeNameLen);
 
                 newNode->data = calloc(1, sizeof(int));
 
-                // open named pipe
+                // Open named pipe
                 *((int *)newNode->data) = open(((char *)newNode->key), O_CREAT | O_WRONLY); // Create if doesn't exist, write-only
                 if (*((int *)newNode->data) < 0)
                 {
                     fprintf(stderr, "Failed to create named pipe: %s\n", ((char *)newNode->key));
-                    continue; // start loop again
+                    continue; // Start loop again
                 }
 
-                // if we successfully opened the pipe, add it to the subscriber list
-                AddNode(subscibers, newNode);
+                // If we successfully opened the pipe, add it to the subscriber list
+                AddNode(subscribers, newNode);
             }
+
+            token = strtok(NULL, ",");
         }
     }
 
     pthread_cleanup_pop(1);
-    return 0;
+    return NULL;
 }
 
-static int *PipeListenerCleanup(void *arg)
+static void PipeListenerCleanup(void *arg)
 {
+    (void)arg;
     int retVal = 0;
     // Close pipe when we're done
     retVal = close(listenerFd);
     if (retVal < 0)
     {
-        int error = errno;
         fprintf(stderr, "Failed to close file handle: %i\n", listenerFd);
-        return error;
+        return;
     }
     unlink(listenerName);
 
     free(listenerData);
 
-    return 0;
+    return;
 }
 
 static void CleanupSubsciberNode(Node *subscriberNode)
@@ -229,7 +238,6 @@ static void CleanupSubsciberNode(Node *subscriberNode)
     retVal = close(*((int *)subscriberNode->data));
     if (retVal < 0)
     {
-        int error = errno;
         fprintf(stderr, "Failed to close subscriber file handle: %i\n", *((int *)subscriberNode->data));
     }
 
