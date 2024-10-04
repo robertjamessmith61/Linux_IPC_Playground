@@ -21,6 +21,10 @@ const char *cmdSubscribe = "subscribe";
 int listenerFd;
 char *listenerData;
 char *listenerName;
+volatile __sig_atomic_t listenerComplete;
+// <<<<
+// >>>> Console variables
+char *consoleData;
 // <<<<
 // <<
 
@@ -28,6 +32,10 @@ char *listenerName;
 // >>>> Listener pipe function declarations
 static void *PipeListener(void *arg);
 static void PipeListenerCleanup(void *arg);
+// <<<<
+// >>>> Console IO function declarations
+static void *ConsoleIO(void *arg);
+static void ConsoleIOCleanup(void *arg);
 // <<<<
 // <<
 
@@ -46,13 +54,23 @@ int main()
     }
 
     pthread_t listenerThread;
-    int listenerReturn;
+    pthread_t consoleThread;
+    int threadReturn;
 
-    listenerReturn = pthread_create(&listenerThread, NULL, PipeListener, (void *)rxName);
-    if (listenerReturn != 0)
+    listenerComplete = 0;
+
+    threadReturn = pthread_create(&listenerThread, NULL, PipeListener, (void *)rxName);
+    if (threadReturn != 0)
     {
         fprintf(stderr, "Failed to start listener thread\n");
-        return listenerReturn;
+        return threadReturn;
+    }
+
+    threadReturn = pthread_create(&consoleThread, NULL, ConsoleIO, NULL);
+    if (threadReturn != 0)
+    {
+        fprintf(stderr, "Failed to start console IO thread\n");
+        return threadReturn;
     }
 
     char *senderData;
@@ -75,15 +93,11 @@ int main()
     // send our subscribe message
     write(txFd, senderData, strcspn(senderData, "\0"));
 
-    // reuse our senderData buffer to read user input looking for the exit command
-    while (1)
-    {
-        printf("Type message and press enter (type exit to close app):\n");
-        if (fgets(senderData, bufLen, stdin) == NULL)
-            continue;
+    free(senderData);
 
-        if (strcmp(senderData, "exit\n") == 0)
-            break;
+    while (!listenerComplete)
+    {
+        sleep(1);
     }
 
     int retVal;
@@ -95,13 +109,22 @@ int main()
         fprintf(stderr, "Failed to send cancelation request to listener thread\n");
     }
 
-    //Wait for listener thread to finish
+    // Wait for listener thread to finish
     pthread_join(listenerThread, NULL);
+
+    // Tell consoleThread to finish
+    retVal = pthread_cancel(consoleThread);
+    if (retVal < 0)
+    {
+        fprintf(stderr, "Failed to send cancelation request to console IO thread\n");
+    }
+
+    // Wait for console thread to finish
+    pthread_join(consoleThread, NULL);
 
     // we can close and unlink our own pipe
     close(txFd);
     unlink(txName);
-    free(senderData);
 
     // Just close the server's listener pipe so others can still use it
     close(listenerFd);
@@ -121,8 +144,8 @@ static void *PipeListener(void *arg)
     listenerData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     // Create named pipe
-    mkfifo(listenerName, 0666);                        // read/write permissions for user/group/everyone
-    listenerFd = open(listenerName, O_CREAT | O_RDWR); // Create if doesn't exist, read-only
+    mkfifo(listenerName, 0666);                          // read/write permissions for user/group/everyone
+    listenerFd = open(listenerName, O_CREAT | O_RDONLY); // Create if doesn't exist, read-only
     if (listenerFd < 0)
     {
         fprintf(stderr, "Failed to create named pipe: %s\n", listenerName);
@@ -139,7 +162,10 @@ static void *PipeListener(void *arg)
         if (count <= 0)
             break; /* end of stream */
         else
-            printf("recieved:\n%s\n", listenerData);
+        {
+            // listenerData[count] = 0; // null terminate string
+            printf("recieved:\n%s", listenerData);
+        }
     }
 
     pthread_cleanup_pop(1);
@@ -161,5 +187,34 @@ static void PipeListenerCleanup(void *arg)
 
     free(listenerData);
 
-    return;
+    listenerComplete = 1;
+}
+
+static void *ConsoleIO(void *arg)
+{
+    (void)arg;
+
+    // Add our cleanup routine so everything is taken care of if we get cancelled or end gracefully
+    pthread_cleanup_push(ConsoleIOCleanup, NULL);
+
+    consoleData = (char *)calloc(CHUNKSIZE, sizeof(char));
+
+    printf("Type exit to close app:\n");
+    do
+    {
+        fgets(consoleData, bufLen, stdin);
+    } while (strcmp(consoleData, "exit\n") != 0 && listenerComplete == 0);    
+
+    pthread_cleanup_pop(1);
+
+    return NULL;
+}
+
+static void ConsoleIOCleanup(void *arg)
+{
+    (void)arg;
+
+    free(consoleData);
+
+    listenerComplete = 1;
 }

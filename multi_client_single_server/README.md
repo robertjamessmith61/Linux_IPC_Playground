@@ -15,7 +15,7 @@ The fifo_client app creates its own named pipe and then sends the name to the se
 Build both fifo_server and fifo_client apps using gcc:
 
 ```bash
-if [ ! -d bin ]; then mkdir bin; fi && gcc -o bin/fifo_server fifo_server.c -pthread && gcc -o bin/fifo_client fifo_client.c -pthread
+if [ ! -d build ]; then mkdir build; fi && cd build && cmake .. && make && cd ..
 ```
 
 ## Running the programs

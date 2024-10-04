@@ -8,10 +8,9 @@
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
+#include <signal.h>
 #include "fifo_common.h"
 #include "linked_list.h"
-
-// https://www.cs.cmu.edu/afs/cs/academic/class/15492-f07/www/pthreads.html
 
 // >> Defines
 #define MAX_CONNECTIONS 32
@@ -41,11 +40,19 @@ static void *PipeListener(void *arg);
 static void PipeListenerCleanup(void *arg);
 static void CleanupSubsciberNode(Node *subscriberNode);
 // <<<<
+// >>>> Signal handlers
+static void HandlerSigpipe(int fd);
+// <<<<
 // <<
 
 // int main(int argc, char *argv[])
 int main()
 {
+    Node *subscriberNode;
+
+    // Need to intercept SIGPIPE to avoid program ending if a pipe is closed from client end.
+    sigaction(SIGPIPE, &(struct sigaction){HandlerSigpipe}, NULL);
+
     // Assign some memory to hold our list of subscribers
     subscribers = (LinkedList *)calloc(1, sizeof(LinkedList));
 
@@ -77,15 +84,17 @@ int main()
         printf("Message:\n");
         printf("%s", senderData);
 
-        Node *subscriberNode = subscribers->first;
+        subscriberNode = subscribers->first;
 
         while (subscriberNode != NULL)
         {
-            ssize_t txCount = write(*((int *)subscriberNode->data), senderData, strcspn(senderData, "\0"));
+            // TODO https://stackoverflow.com/questions/18935446/program-received-signal-sigpipe-broken-pipe
+
+            ssize_t txCount = write(*((int *)subscriberNode->data), senderData, strcspn(senderData, "\0") + 1);
 
             if (txCount > 0)
             {
-                printf("Wrote %li bytes to subscriber %s", txCount, (char *)(subscriberNode->key));
+                printf("Wrote %li bytes to subscriber %s\n", txCount, (char *)(subscriberNode->key));
             }
 
             subscriberNode = subscriberNode->next;
