@@ -27,6 +27,7 @@ const char *cmdSubscribe = "subscribe";
 int listenerFd;
 char *listenerData;
 char *listenerName;
+char *cmdParseData;
 // <<<<
 
 // >>>> Sender variables
@@ -51,7 +52,7 @@ int main()
     Node *subscriberNode;
 
     // Need to intercept SIGPIPE to avoid program ending if a pipe is closed from client end.
-    sigaction(SIGPIPE, &(struct sigaction){HandlerSigpipe}, NULL);
+    signal(SIGPIPE, HandlerSigpipe);
 
     // Assign some memory to hold our list of subscribers
     subscribers = (LinkedList *)calloc(1, sizeof(LinkedList));
@@ -111,10 +112,12 @@ int main()
     }
 
     // Close all of our connections
-    Node *subscriberNode = subscribers->first;
+    subscriberNode = subscribers->first;
 
     while (subscriberNode != NULL)
     {
+        printf("node->%li, key->%li, fd->%li", (long)subscriberNode, (long)subscriberNode->key, (long)subscriberNode->data);
+
         CleanupSubsciberNode(subscriberNode);
         DelNodeByAddress(subscribers, subscriberNode);
         subscriberNode = subscribers->first;
@@ -140,6 +143,7 @@ static void *PipeListener(void *arg)
 
     // Allocate rx buffer
     listenerData = (char *)calloc(CHUNKSIZE, sizeof(char));
+    // cmdParseData = (char *)calloc(CHUNKSIZE, sizeof(char));
 
     // Create named pipe
     mkfifo(listenerName, 0666);                        // read/write permissions for user/group/everyone
@@ -175,6 +179,7 @@ static void *PipeListener(void *arg)
             if (strncmp(token, cmdSubscribe, strlen(cmdSubscribe)) == 0)
             {
                 token = strtok(NULL, ",");
+                printf("pipeName: %s\n", token);
 
                 if (token == NULL)
                 {
@@ -252,4 +257,19 @@ static void CleanupSubsciberNode(Node *subscriberNode)
 
     free(subscriberNode->data);
     free(subscriberNode->key);
+}
+
+static void HandlerSigpipe(int fd)
+{
+    fprintf(stderr, "SIGPIPE error, file handle: %i\n", fd);
+
+    int retVal = 0;
+    // Close pipe when we're done
+    retVal = close(fd);
+    if (retVal < 0)
+    {
+        fprintf(stderr, "Failed to close file handle: %i\n", fd);
+    }
+
+    return;
 }

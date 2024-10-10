@@ -87,13 +87,16 @@ int main()
     }
 
     // load up our message to subscribe to the server
-    snprintf(senderData, bufLen, "%s,%s", cmdSubscribe, rxName);
+    snprintf(senderData, bufLen, ",%s,%s,", cmdSubscribe, rxName);
     printf("Sending:\n");
     printf("%s\n", senderData);
     // send our subscribe message
     write(txFd, senderData, strcspn(senderData, "\0"));
 
     free(senderData);
+
+    // Just close the server's listener pipe so others can still use it
+    close(txFd);
 
     while (!listenerComplete)
     {
@@ -121,13 +124,6 @@ int main()
 
     // Wait for console thread to finish
     pthread_join(consoleThread, NULL);
-
-    // we can close and unlink our own pipe
-    close(txFd);
-    unlink(txName);
-
-    // Just close the server's listener pipe so others can still use it
-    close(listenerFd);
 
     return 0;
 }
