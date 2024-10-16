@@ -116,8 +116,6 @@ int main()
 
     while (subscriberNode != NULL)
     {
-        printf("node->%li, key->%li, fd->%li", (long)subscriberNode, (long)subscriberNode->key, (long)subscriberNode->data);
-
         CleanupSubsciberNode(subscriberNode);
         DelNodeByAddress(subscribers, subscriberNode);
         subscriberNode = subscribers->first;

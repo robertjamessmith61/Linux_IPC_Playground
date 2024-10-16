@@ -44,8 +44,12 @@ int DelNodeByAddress(LinkedList *list, Node *nodeAddress)
         {
             if (currentNode->prev != NULL)
                 currentNode->prev->next = currentNode->next;
+            else
+                list->first = currentNode->next;
             if (currentNode->next != NULL)
                 currentNode->next->prev = currentNode->prev;
+            else
+                list->last = currentNode->prev;
             list->count--;
             free(currentNode);
             return list->count;
