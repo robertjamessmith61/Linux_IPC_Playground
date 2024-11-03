@@ -12,10 +12,18 @@ The fifo_client app creates its own named pipe and then sends the name to the se
 
 ## Build
 
-Build both fifo_server and fifo_client apps using gcc:
+Build both fifo_server and fifo_client apps using cmake:
 
 ```bash
 if [ ! -d build ]; then mkdir build; fi && cd build && cmake .. && make && cd ..
+```
+
+Alternatively you can call either the debug.sh or release.sh scripts to build both apps.
+
+```bash
+./debug.sh
+# OR
+./release.sh
 ```
 
 ## Running the programs
@@ -23,13 +31,13 @@ if [ ! -d build ]; then mkdir build; fi && cd build && cmake .. && make && cd ..
 Start the fifo_server process first:
 
 ```bash
-./bin/fifo_server
+./build/fifo_server
 ```
 
 Then start multiple fifo_client processes in separate terminals:
 
 ```bash
-./bin/fifo_client
+./build/fifo_client
 ```
 
 Type some text in the fifo_server terminal and press enter:

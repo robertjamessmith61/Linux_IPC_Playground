@@ -12,7 +12,8 @@
 
 // >> Constants
 const long bufLen = CHUNKSIZE * sizeof(char);
-const char *txName = "./fifo_listener";
+const char *fd_dir = "./file_descriptors";
+const char *txName = "./file_descriptors/fifo_listener";
 const char *cmdSubscribe = "subscribe";
 // <<
 
@@ -43,9 +44,23 @@ static void ConsoleIOCleanup(void *arg);
 
 int main()
 {
+    int retVal;
+
+    // Create a directory to store our file descriptors if it does not exist already.
+    struct stat st;
+    if (stat(fd_dir, &st) != 0)
+    {
+        retVal = mkdir(fd_dir, S_IRWXU | S_IRWXG | S_IRWXO);
+        if (retVal < 0)
+        {
+            fprintf(stderr, "Failed to create \"%s\" directory.\nError: %s\n", fd_dir, strerror(errno));
+            return retVal;
+        }
+    }
+
     char rxName[MAX_PIPE_NAME_LEN];
 
-    int subNameLen = snprintf(rxName, MAX_PIPE_NAME_LEN, "./fifo_sub_%i", getpid());
+    int subNameLen = snprintf(rxName, MAX_PIPE_NAME_LEN, "%s/fifo_sub_%i", fd_dir, getpid());
 
     if (subNameLen < 0 || subNameLen > MAX_PIPE_NAME_LEN)
     {
@@ -102,8 +117,6 @@ int main()
     {
         sleep(1);
     }
-
-    int retVal;
 
     // Tell listenerThread to finish
     retVal = pthread_cancel(listenerThread);

@@ -18,7 +18,8 @@
 
 // >> Constants
 const long bufLen = CHUNKSIZE * sizeof(char);
-const char *rxName = "./fifo_listener";
+const char *fd_dir = "./file_descriptors";
+const char *rxName = "./file_descriptors/fifo_listener";
 const char *cmdSubscribe = "subscribe";
 // <<
 
@@ -51,6 +52,20 @@ int main()
 {
     Node *subscriberNode;
 
+    int retVal;
+
+    // Create a directory to store our file descriptors if it does not exist already.
+    struct stat st;
+    if (stat(fd_dir, &st) != 0)
+    {
+        retVal = mkdir(fd_dir, S_IRWXU | S_IRWXG | S_IRWXO);
+        if (retVal < 0)
+        {
+            fprintf(stderr, "Failed to create \"%s\" directory.\nError: %s\n", fd_dir, strerror(errno));
+            return retVal;
+        }
+    }
+
     // Need to intercept SIGPIPE to avoid program ending if a pipe is closed from client end.
     signal(SIGPIPE, HandlerSigpipe);
 
@@ -59,14 +74,13 @@ int main()
 
     // Create our separate thread to handle our listener pipe
     pthread_t listenerThread;
-    int listenerReturn;
 
-    listenerReturn = pthread_create(&listenerThread, NULL, PipeListener, (void *)rxName);
-    if (listenerReturn != 0)
+    retVal = pthread_create(&listenerThread, NULL, PipeListener, (void *)rxName);
+    if (retVal < 0)
     {
         fprintf(stderr, "Failed to start listener thread\n");
         free(subscribers);
-        return listenerReturn;
+        return retVal;
     }
 
     // Allocate a buffer for our data we are going to push to subscribers
@@ -101,8 +115,6 @@ int main()
             subscriberNode = subscriberNode->next;
         }
     }
-
-    int retVal;
 
     // Tell listenerThread to finish
     retVal = pthread_cancel(listenerThread);
