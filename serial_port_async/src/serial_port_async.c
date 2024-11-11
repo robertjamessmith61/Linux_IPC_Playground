@@ -13,7 +13,6 @@
 // https://linux.die.net/man/7/aio
 // https://stackoverflow.com/questions/39289676/linux-serial-communication-with-interrupts
 
-
 // >> Defines
 #define BAUDRATE 115200
 #define BUF_LEN 4095 // Max input buffer length according to termios man page
@@ -49,7 +48,7 @@ int main()
     // Zero new serial device config
     memset(&newtio, 0, sizeof(newtio));
     // Setup our new serial device config
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL |CREAD;
+    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
     newtio.c_lflag = 0; // RAW mode
@@ -57,5 +56,10 @@ int main()
     newtio.c_cc[VTIME] = 0;
     newtio.c_cc[VMIN] = 10;
 
+    tcflush(fd, TCIFLUSH);
+    tcsetattr(fd, TCSANOW, &newtio);
+
+    // Important, we restore original serial device config before exiting
+    tcsetattr(fd,TCSANOW,&oldtio);
     return 0;
 }
