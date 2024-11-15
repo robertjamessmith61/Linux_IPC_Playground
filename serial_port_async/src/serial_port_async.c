@@ -1,10 +1,15 @@
+#define _XOPEN_SOURCE 700
+
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <termios.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
 #include <string.h>
 
 // https://tldp.org/HOWTO/Serial-Programming-HOWTO/x115.html
@@ -16,31 +21,66 @@
 // >> Defines
 #define BAUDRATE 115200
 #define BUF_LEN 4095 // Max input buffer length according to termios man page
-#define SERIAL_DEV "/dev/ttyUSB1"
+#define SERIAL_DEV "/dev/ttyUSB0"
 // <<
 
-// >> Variables
+// >> Global Variables
 
+// <<
+
+// >> Function Declarations
+// void SigHandlerIO(int status);
 // <<
 
 int main()
 {
-    int fd;
+    int
+        i,
+        errnum,
+        fd,
+        result;
+
+    fd_set fdSet;
 
     struct termios
         oldtio,
         newtio;
 
-    char buf[BUF_LEN];
+    // struct sigaction sigActIO = {0};
+
+    char
+        *buf = calloc(BUF_LEN, sizeof(char)),
+        *hexString = calloc(BUF_LEN * 3, sizeof(char)),
+        *hexPointer,
+        *charString = calloc(BUF_LEN * 3, sizeof(char)),
+        *charPointer;
 
     // Try to open serial device
     fd = open(SERIAL_DEV, O_RDWR | O_NOCTTY);
     if (fd < 0)
     {
-        int errnum = errno;
-        fprintf(stderr, "Error opening serial device: %s\n", strerror(errnum));
+        errnum = errno;
+        fprintf(stderr, "Error opening serial device [%s]: %s\n", SERIAL_DEV, strerror(errnum));
         exit(errnum);
     }
+
+    // // Install signal handler
+    // sigActIO.sa_handler = SigHandlerIO;
+    // sigActIO.sa_flags = 0;
+    // sigActIO.sa_restorer = NULL;
+
+    // if (sigaction(SIGIO, &sigActIO, NULL) == -1)
+    // {
+    //     errnum = errno;
+    //     fprintf(stderr, "Error installing IO signal handler: %s\n", strerror(errnum));
+    //     exit(errnum);
+    // }
+
+    // // Make this process the owner of the SIGIO signal for our serial device
+    // fcntl(fd, F_SETOWN, getpid());
+
+    // // Make file descriptor async
+    // fcntl(fd, F_SETFL, O_ASYNC);
 
     // Store our original serial device config
     tcgetattr(fd, &oldtio);
@@ -59,7 +99,41 @@ int main()
     tcflush(fd, TCIFLUSH);
     tcsetattr(fd, TCSANOW, &newtio);
 
+    while (1)
+    {
+        FD_SET(fd, &fdSet);
+
+        select(fd + 1, &fdSet, NULL, NULL, NULL);
+
+        if (FD_ISSET(fd, &fdSet))
+        {
+            result = read(fd, buf, BUF_LEN);
+
+            hexPointer = hexString;
+            charPointer = charString;
+
+            for (i = 0; i < result; i++)
+            {
+                hexPointer += sprintf(hexPointer, ",%02X", buf[i]);
+            }
+
+            for (i = 0; i < result; i++)
+            {
+                if (buf[i] >= 32 && buf[i] < 127)
+                    charPointer += sprintf(charPointer, ", %c", buf[i]);
+                else
+                    charPointer += sprintf(charPointer, ",..");
+            }
+
+            printf(" %s\n", hexString);
+            printf(" %s\n", charString);
+        }
+    }
     // Important, we restore original serial device config before exiting
-    tcsetattr(fd,TCSANOW,&oldtio);
+    tcsetattr(fd, TCSANOW, &oldtio);
+
+    free(buf);
+    free(hexString);
+    free(charString);
     return 0;
 }
