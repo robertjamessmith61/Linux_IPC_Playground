@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <string.h>
+#include <pthread.h>
 
 // https://tldp.org/HOWTO/Serial-Programming-HOWTO/x115.html
 // https://stackoverflow.com/questions/76897228/linux-uart-read-in-non-blocking-mode-is-stuck-while-other-low-priority-thread-is
@@ -25,11 +26,12 @@
 // <<
 
 // >> Global Variables
-
+int serialFd;
 // <<
 
 // >> Function Declarations
-// void SigHandlerIO(int status);
+static void *SerialReader(void * arg);
+static void SerialReaderCleanup(void *arg);
 // <<
 
 int main()
@@ -37,7 +39,6 @@ int main()
     int
         i,
         errnum,
-        fd,
         result;
 
     fd_set fdSet;
@@ -45,8 +46,6 @@ int main()
     struct termios
         oldtio,
         newtio;
-
-    // struct sigaction sigActIO = {0};
 
     char
         *buf = calloc(BUF_LEN, sizeof(char)),
@@ -56,8 +55,8 @@ int main()
         *charPointer;
 
     // Try to open serial device
-    fd = open(SERIAL_DEV, O_RDWR | O_NOCTTY);
-    if (fd < 0)
+    serialFd = open(SERIAL_DEV, O_RDWR | O_NOCTTY);
+    if (serialFd < 0)
     {
         errnum = errno;
         fprintf(stderr, "Error opening serial device [%s]: %s\n", SERIAL_DEV, strerror(errnum));
@@ -65,7 +64,7 @@ int main()
     }
 
     // Store our original serial device config
-    tcgetattr(fd, &oldtio);
+    tcgetattr(serialFd, &oldtio);
 
     // Zero new serial device config
     memset(&newtio, 0, sizeof(newtio));
@@ -84,18 +83,18 @@ int main()
     cfsetispeed(&newtio, 0); // set to zero to match output speed above.
 
 
-    tcflush(fd, TCIFLUSH);
-    tcsetattr(fd, TCSANOW, &newtio);
+    tcflush(serialFd, TCIFLUSH);
+    tcsetattr(serialFd, TCSANOW, &newtio);
 
     while (1)
     {
-        FD_SET(fd, &fdSet);
+        FD_SET(serialFd, &fdSet);
 
-        select(fd + 1, &fdSet, NULL, NULL, NULL);
+        select(serialFd + 1, &fdSet, NULL, NULL, NULL);
 
-        if (FD_ISSET(fd, &fdSet))
+        if (FD_ISSET(serialFd, &fdSet))
         {
-            result = read(fd, buf, BUF_LEN);
+            result = read(serialFd, buf, BUF_LEN);
 
             hexPointer = hexString;
             charPointer = charString;
@@ -118,10 +117,16 @@ int main()
         }
     }
     // Important, we restore original serial device config before exiting
-    tcsetattr(fd, TCSANOW, &oldtio);
+    tcsetattr(serialFd, TCSANOW, &oldtio);
 
     free(buf);
     free(hexString);
     free(charString);
     return 0;
+}
+
+
+static void *SerialReader(void *arg)
+{
+    
 }
