@@ -1,10 +1,10 @@
-# Serial Port Async Example
+# Serial Port pThread Example
 
-This is a small example project for a basic async serial port program.
+This is a small example project for a basic multi-threaded serial port program.
 
 ## Description
 
-The serial_port_async program opens the serial port specified as the first argument and allows the user to send bytes input as hex characters from stdin. It prints whatever it recieves in response to stdout.
+The serial_port_pthread program opens the serial port specified as the first argument and allows the user to send bytes input as hex characters from stdin. It prints whatever it recieves in response to stdout.
 
 ## Build
 

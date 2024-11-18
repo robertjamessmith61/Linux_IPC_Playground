@@ -19,7 +19,7 @@
 // https://stackoverflow.com/questions/39289676/linux-serial-communication-with-interrupts
 
 // >> Defines
-#define BAUDRATE 115200
+#define BAUDRATE B115200
 #define BUF_LEN 4095 // Max input buffer length according to termios man page
 #define SERIAL_DEV "/dev/ttyUSB0"
 // <<
@@ -64,37 +64,25 @@ int main()
         exit(errnum);
     }
 
-    // // Install signal handler
-    // sigActIO.sa_handler = SigHandlerIO;
-    // sigActIO.sa_flags = 0;
-    // sigActIO.sa_restorer = NULL;
-
-    // if (sigaction(SIGIO, &sigActIO, NULL) == -1)
-    // {
-    //     errnum = errno;
-    //     fprintf(stderr, "Error installing IO signal handler: %s\n", strerror(errnum));
-    //     exit(errnum);
-    // }
-
-    // // Make this process the owner of the SIGIO signal for our serial device
-    // fcntl(fd, F_SETOWN, getpid());
-
-    // // Make file descriptor async
-    // fcntl(fd, F_SETFL, O_ASYNC);
-
     // Store our original serial device config
     tcgetattr(fd, &oldtio);
 
     // Zero new serial device config
     memset(&newtio, 0, sizeof(newtio));
     // Setup our new serial device config
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+    // newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+    newtio.c_cflag = CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
     newtio.c_lflag = 0; // RAW mode
 
     newtio.c_cc[VTIME] = 0;
-    newtio.c_cc[VMIN] = 10;
+    newtio.c_cc[VMIN] = 1;
+
+    // Manually set baud rate in case cflag above doesn't work.
+    cfsetospeed(&newtio, B115200);
+    cfsetispeed(&newtio, 0); // set to zero to match output speed above.
+
 
     tcflush(fd, TCIFLUSH);
     tcsetattr(fd, TCSANOW, &newtio);
