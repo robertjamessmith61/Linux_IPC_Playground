@@ -26,12 +26,29 @@
 // <<
 
 // >> Global Variables
+// >>>> Global Serial Variables
 int serialFd;
+struct termios
+    oldtio,
+    newtio;
+// <<<<
+// >>>> Serial Reader Variables
+pthread_t serialReaderThread;
+char *
+    serialReaderBuf,
+    hexString,
+    hexPointer,
+    charString,
+    charPointer;
+// <<<<
 // <<
 
 // >> Function Declarations
-static void *SerialReader(void * arg);
+// static void MainCleanup(void * arg);
+// >>>> Serial Reader
+static void *SerialReader(void *arg);
 static void SerialReaderCleanup(void *arg);
+// <<<<
 // <<
 
 int main()
@@ -41,18 +58,7 @@ int main()
         errnum,
         result;
 
-    fd_set fdSet;
-
-    struct termios
-        oldtio,
-        newtio;
-
-    char
-        *buf = calloc(BUF_LEN, sizeof(char)),
-        *hexString = calloc(BUF_LEN * 3, sizeof(char)),
-        *hexPointer,
-        *charString = calloc(BUF_LEN * 3, sizeof(char)),
-        *charPointer;
+    // >> SERIAL SETUP START
 
     // Try to open serial device
     serialFd = open(SERIAL_DEV, O_RDWR | O_NOCTTY);
@@ -82,9 +88,68 @@ int main()
     cfsetospeed(&newtio, B115200);
     cfsetispeed(&newtio, 0); // set to zero to match output speed above.
 
-
+    // Flush buffer and write new settings to serial device.
     tcflush(serialFd, TCIFLUSH);
     tcsetattr(serialFd, TCSANOW, &newtio);
+
+    // << SERIAL SETUP FINISH
+
+    // Create Serial listener thread.
+    result = pthread_create(&serialReaderThread, NULL, SerialReader, (void *)serialFd);
+    if (result < 0)
+    {
+        errnum = errno;
+        fprintf(stderr, "Error starting serial listener thread: %s\n", strerror(errnum));
+        exit(errnum);
+    }
+
+    // INSERT CODE HERE
+
+    // Request Serial listener thread to finish.
+    result = pthread_cancel(serialReaderThread);
+    if (result < 0)
+    {
+        errnum = errno;
+        fprintf(stderr, "Failed to send cancellation listener thread: %s\n", strerror(errnum));
+        exit(errnum);
+    }
+
+    // Try to close serial device
+    result = close(serialFd);
+    if (result < 0)
+    {
+        errnum = errno;
+        fprintf(stderr, "Error closing serial device [%s]: %s\n", SERIAL_DEV, strerror(errnum));
+        exit(errnum);
+    }
+
+    // Important, we restore original serial device config before exiting
+    tcsetattr(serialFd, TCSANOW, &oldtio);
+
+    // free(buf);
+    // free(hexString);
+    // free(charString);
+
+    // Wait for Serial listener thread to finish.
+    pthread_join(serialReaderThread, NULL);
+
+    return 0;
+}
+
+static void *SerialReader(void *arg)
+{
+    // Add our cleanup routine so everything is taken care of if we get cancelled or end gracefully
+    pthread_cleanup_push(SerialReaderCleanup, NULL);
+
+    int
+        i,
+        result;
+
+    fd_set fdSet;
+
+    serialReaderBuf = calloc(BUF_LEN, sizeof(char));
+    hexString = calloc(BUF_LEN * 3, sizeof(char));
+    charString = calloc(BUF_LEN * 3, sizeof(char));
 
     while (1)
     {
@@ -94,20 +159,20 @@ int main()
 
         if (FD_ISSET(serialFd, &fdSet))
         {
-            result = read(serialFd, buf, BUF_LEN);
+            result = read(serialFd, serialReaderBuf, BUF_LEN);
 
             hexPointer = hexString;
             charPointer = charString;
 
             for (i = 0; i < result; i++)
             {
-                hexPointer += sprintf(hexPointer, ",%02X", buf[i]);
+                hexPointer += sprintf(hexPointer, ",%02X", serialReaderBuf[i]);
             }
 
             for (i = 0; i < result; i++)
             {
-                if (buf[i] >= 32 && buf[i] < 127)
-                    charPointer += sprintf(charPointer, ", %c", buf[i]);
+                if (serialReaderBuf[i] >= 32 && serialReaderBuf[i] < 127)
+                    charPointer += sprintf(charPointer, ", %c", serialReaderBuf[i]);
                 else
                     charPointer += sprintf(charPointer, ",..");
             }
@@ -116,17 +181,14 @@ int main()
             printf(" %s\n", charString);
         }
     }
-    // Important, we restore original serial device config before exiting
-    tcsetattr(serialFd, TCSANOW, &oldtio);
 
-    free(buf);
-    free(hexString);
-    free(charString);
-    return 0;
+    pthread_cleanup_pop(1);
+    return NULL;
 }
 
-
-static void *SerialReader(void *arg)
+static void SerialReaderCleanup(void *arg)
 {
-    
+    free(serialReaderBuf);
+    free(hexString);
+    free(charString);
 }
