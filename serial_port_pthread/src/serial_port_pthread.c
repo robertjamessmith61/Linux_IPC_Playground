@@ -31,15 +31,17 @@ int serialFd;
 struct termios
     oldtio,
     newtio;
+
+int serialDebugFd[2];
 // <<<<
 // >>>> Serial Reader Variables
 pthread_t serialReaderThread;
-char *
-    serialReaderBuf,
-    hexString,
-    hexPointer,
-    charString,
-    charPointer;
+char
+    *serialReaderBuf,
+    *hexString,
+    *hexPointer,
+    *charString,
+    *charPointer;
 // <<<<
 // <<
 
@@ -54,7 +56,6 @@ static void SerialReaderCleanup(void *arg);
 int main()
 {
     int
-        i,
         errnum,
         result;
 
@@ -94,8 +95,17 @@ int main()
 
     // << SERIAL SETUP FINISH
 
+    // Create simple pipe for passing debug messages out of serialReaderThread
+    result = pipe(serialDebugFd);
+    if (result < 0)
+    {
+        errnum = errno;
+        fprintf(stderr, "Error creating serialDebugFd pipe: %s\n", strerror(errnum));
+        exit(errnum);
+    }
+
     // Create Serial listener thread.
-    result = pthread_create(&serialReaderThread, NULL, SerialReader, (void *)serialFd);
+    result = pthread_create(&serialReaderThread, NULL, SerialReader, NULL);
     if (result < 0)
     {
         errnum = errno;
@@ -103,7 +113,50 @@ int main()
         exit(errnum);
     }
 
-    // INSERT CODE HERE
+    fd_set fdSetMain;
+    char *inputData = calloc(BUF_LEN, sizeof(char));
+    char *debugData = calloc(BUF_LEN * 3, sizeof(char));
+    while (1)
+    {
+        printf("Type exit to close app:\n");
+
+        FD_SET(0, &fdSetMain);
+        FD_SET(serialDebugFd[0], &fdSetMain);
+        select(serialDebugFd[0] + 1, &fdSetMain, NULL, NULL, NULL);
+
+        if (FD_ISSET(0, &fdSetMain))
+        {
+            if (fgets(inputData, BUF_LEN, stdin) == NULL)
+                continue;
+
+            if (strcmp(inputData, "exit\n") == 0)
+                break;
+        }
+        else if (FD_ISSET(serialDebugFd[0], &fdSetMain))
+        {
+            // Print out debug message
+            result = read(serialDebugFd[0], debugData, BUF_LEN * 3);
+            if (result < 0)
+            {
+                errnum = errno;
+                fprintf(stderr, "Error reading from serialDebugPipe: %s\n", strerror(errnum));
+            }
+            else
+            {
+                int bytesWritten = 0;
+                // char *debugDataPointer = debugData;
+
+                while (bytesWritten < result - 1)
+                {
+                    bytesWritten += printf("%s\n", debugData + bytesWritten);
+                }
+            }
+        }
+    }
+    free(inputData);
+
+    // Close our end of debug pipe now we're done
+    close(serialDebugFd[0]);
 
     // Request Serial listener thread to finish.
     result = pthread_cancel(serialReaderThread);
@@ -126,10 +179,6 @@ int main()
     // Important, we restore original serial device config before exiting
     tcsetattr(serialFd, TCSANOW, &oldtio);
 
-    // free(buf);
-    // free(hexString);
-    // free(charString);
-
     // Wait for Serial listener thread to finish.
     pthread_join(serialReaderThread, NULL);
 
@@ -138,48 +187,46 @@ int main()
 
 static void *SerialReader(void *arg)
 {
+    (void)arg;
+
     // Add our cleanup routine so everything is taken care of if we get cancelled or end gracefully
-    pthread_cleanup_push(SerialReaderCleanup, NULL);
+    pthread_cleanup_push(SerialReaderCleanup, arg);
 
     int
         i,
         result;
 
-    fd_set fdSet;
-
     serialReaderBuf = calloc(BUF_LEN, sizeof(char));
     hexString = calloc(BUF_LEN * 3, sizeof(char));
     charString = calloc(BUF_LEN * 3, sizeof(char));
 
+    write(serialDebugFd[1], "serialReaderThread Started...", 30);
+
     while (1)
     {
-        FD_SET(serialFd, &fdSet);
+        result = read(serialFd, serialReaderBuf, BUF_LEN);
 
-        select(serialFd + 1, &fdSet, NULL, NULL, NULL);
+        hexPointer = hexString;
+        charPointer = charString;
 
-        if (FD_ISSET(serialFd, &fdSet))
+        hexPointer += sprintf(hexPointer, "HEX STRING ");
+        for (i = 0; i < result; i++)
         {
-            result = read(serialFd, serialReaderBuf, BUF_LEN);
-
-            hexPointer = hexString;
-            charPointer = charString;
-
-            for (i = 0; i < result; i++)
-            {
-                hexPointer += sprintf(hexPointer, ",%02X", serialReaderBuf[i]);
-            }
-
-            for (i = 0; i < result; i++)
-            {
-                if (serialReaderBuf[i] >= 32 && serialReaderBuf[i] < 127)
-                    charPointer += sprintf(charPointer, ", %c", serialReaderBuf[i]);
-                else
-                    charPointer += sprintf(charPointer, ",..");
-            }
-
-            printf(" %s\n", hexString);
-            printf(" %s\n", charString);
+            hexPointer += sprintf(hexPointer, ",%02X", serialReaderBuf[i]);
         }
+
+        charPointer += sprintf(charPointer, "CHAR STRING ");
+        for (i = 0; i < result; i++)
+        {
+            if (serialReaderBuf[i] >= 32 && serialReaderBuf[i] < 127)
+                charPointer += sprintf(charPointer, ", %c", serialReaderBuf[i]);
+            else
+                charPointer += sprintf(charPointer, ",..");
+        }
+
+        write(serialDebugFd[1], charString, strlen(charString) + 1);
+        write(serialDebugFd[1], hexString, strlen(hexString) + 1);
+
     }
 
     pthread_cleanup_pop(1);
@@ -188,6 +235,9 @@ static void *SerialReader(void *arg)
 
 static void SerialReaderCleanup(void *arg)
 {
+    (void)arg;
+    close(serialDebugFd[1]);
+
     free(serialReaderBuf);
     free(hexString);
     free(charString);
