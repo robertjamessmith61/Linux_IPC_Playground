@@ -8,14 +8,6 @@ The serial_port_pthread program opens the serial port specified as the first arg
 
 ## Build
 
-Build both fifo_sender and fifo_reader apps using gcc:
-
-```bash
-if [ ! -d bin ]; then mkdir bin; fi && gcc -o bin/fifo_sender fifo_sender.c -pthread && gcc -o bin/fifo_reader fifo_reader.c -pthread
-```
-
-## Build
-
 Build the app using cmake:
 
 ```bash
