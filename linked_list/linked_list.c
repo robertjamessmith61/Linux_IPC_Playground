@@ -1,6 +1,6 @@
 /* Define a simple double Linked List*/
 
-#include <stddef.h>
+#include <stdlib.h>
 #include "linked_list.h"
 
 /*
