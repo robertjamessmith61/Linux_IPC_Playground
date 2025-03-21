@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include "linked_list.h"
+#include <string.h>
 
 /*
 Add a node to the Linked List.
